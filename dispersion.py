@@ -1,4 +1,3 @@
-%%writefile dispersion.py
 import math
 import numpy as np
 from shapely.geometry import Polygon
