@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>BlastSafe DSS — Monitor de Dispersión</title>
+    <link rel="stylesheet" href="https://unpkg.com" />
+    <style>
+        body { margin: 0; font-family: system-ui, sans-serif; display: flex; height: 100vh; background: #111; color: #eee; }
+        #sidebar { width: 340px; padding: 20px; background: #1e1e24; overflow-y: auto; border-right: 1px solid #333; }
+        #map { flex: 1; height: 100%; }
+        input, button { width: 100%; padding: 8px; margin: 6px 0 14px; border-radius: 6px; border: 1px solid #444; background: #2b2b33; color: #fff; box-sizing: border-box; }
+        button { background: #2563eb; border: none; font-weight: bold; cursor: pointer; }
+        button:hover { background: #1d4ed8; }
+        .badge { padding: 8px; border-radius: 6px; text-align: center; font-weight: bold; margin-bottom: 12px; }
+        .GO { background: #166534; color: #bbf7d0; }
+        .NO_GO { background: #991b1b; color: #fecaca; }
+        ul { padding-left: 18px; font-size: 0.9rem; color: #fca5a5; }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h2>BlastSafe DSS</h2>
+        <label>Latitud:</label>
+        <input type="number" id="lat" step="0.0001" value="40.8065">
+        <label>Longitud:</label>
+        <input type="number" id="lon" step="0.0001" value="-91.2468">
+        <label>Masa Explosivo (kg):</label>
+        <input type="number" id="masa" value="4400">
+        <button onclick="cargarSimulacion()">Simular Escenario (24h)</button>
+
+        <hr style="border-color: #333; margin: 16px 0;">
+        <label>Ventana Horaria: <strong id="lbl-hora">+0h</strong></label>
+        <input type="range" id="slider" min="0" max="23" value="0" oninput="renderizarHora(this.value)">
+
+        <div id="estado-box" class="badge GO">Cargando...</div>
+        <div id="detalles" style="font-size: 0.92rem; line-height: 1.5;"></div>
+        <ul id="lista-alertas"></ul>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com"></script>
+    <script>
+        const map = L.map('map').setView([40.8065, -91.2468], 11);
+        
+        // URL satelital construida por partes para evitar recortes
+        const hostEsri = "https:" + "//://arcgisonline.com";
+        L.tileLayer(`${hostEsri}/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
+            attribution: 'Esri World Imagery'
+        }).addTo(map);
+
+        let datosSimulacion = [];
+        let capaPluma = null;
+        let marcadorOrigen = null;
+        let capaAlertas = L.layerGroup().addTo(map);
+
+        async function cargarSimulacion() {
+            const lat = document.getElementById('lat').value;
+            const lon = document.getElementById('lon').value;
+            const masa = document.getElementById('masa').value;
+
+            document.getElementById('estado-box').innerText = "Calculando...";
+            const resp = await fetch(`/api/simular?lat=${lat}&lon=${lon}&masa_kg=${masa}`);
+            const data = await resp.json();
+
+            datosSimulacion = data.horas;
+            const slider = document.getElementById('slider');
+            slider.max = Math.max(0, datosSimulacion.length - 1);
+            slider.value = 0;
+
+            map.setView([lat, lon], 11);
+            if (marcadorOrigen) map.removeLayer(marcadorOrigen);
+            marcadorOrigen = L.marker([lat, lon]).addTo(map).bindPopup("Punto de Detonación");
+
+            renderizarHora(0);
+        }
+
+        function renderizarHora(idx) {
+            if (!datosSimulacion.length) return;
+            const h = datosSimulacion[idx];
+            document.getElementById('lbl-hora').innerText = `+${idx}h (${h.hora})`;
+
+            const box = document.getElementById('estado-box');
+            box.className = `badge ${h.estado}`;
+            box.innerText = h.estado === "GO" ? "GO — VENTANA SEGURA" : "NO_GO — ALTO RIESGO";
+
+            document.getElementById('detalles').innerHTML = `
+                <b>Viento:</b> ${h.viento_ms} m/s (Origen: ${h.direccion_origen}°)<br>
+                <b>Inversión Térmica:</b> ${h.inversion ? "SÍ (Peligro)" : "No"}<br>
+                <b>Zonas afectadas:</b> ${h.afectados.length}
+            `;
+
+            const lista = document.getElementById('lista-alertas');
+            lista.innerHTML = h.afectados.map(z => `<li>${z.nombre} (${z.tipo})</li>`).join('');
+
+            if (capaPluma) map.removeLayer(capaPluma);
+            capaAlertas.clearLayers();
+
+            if (h.pluma_geojson) {
+                const color = h.estado === "GO" ? "#22c55e" : "#ef4444";
+                capaPluma = L.geoJSON(h.pluma_geojson, {
+                    style: { color: color, fillColor: color, weight: 2, fillOpacity: 0.45 }
+                }).addTo(map);
+            }
+
+            h.afectados.forEach(z => {
+                L.circleMarker([z.lat, z.lon], { radius: 7, color: "#a855f7", fillOpacity: 0.9 })
+                 .bindPopup(`${z.nombre} (${z.tipo})`)
+                 .addTo(capaAlertas);
+            });
+        }
+
+        cargarSimulacion();
+    </script>
+</body>
+</html>
