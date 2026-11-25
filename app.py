@@ -1,17 +1,32 @@
+from pathlib import Path
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 from shapely.geometry import mapping
+import traceback
 import clima
 import dispersion
 import zonas_gis
 
 app = FastAPI(title="BlastSafe DSS API")
-templates = Jinja2Templates(directory="templates")
+
+BASE_DIR = Path(__file__).resolve().parent
+TEMPLATES_DIR = BASE_DIR / "templates"
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    try:
+        index_path = TEMPLATES_DIR / "index.html"
+        if not index_path.exists():
+            archivos = [p.name for p in BASE_DIR.iterdir()]
+            return PlainTextResponse(
+                f"Error: No se encuentra {index_path}. Archivos en raíz: {archivos}",
+                status_code=500
+            )
+        return templates.TemplateResponse(request=request, name="index.html")
+    except Exception:
+        return PlainTextResponse(traceback.format_exc(), status_code=500)
 
 @app.get("/api/simular")
 def simular_escenario(lat: float = 40.8065, lon: float = -91.2468, masa_kg: float = 4400.0):
@@ -39,7 +54,6 @@ def simular_escenario(lat: float = 40.8065, lon: float = -91.2468, masa_kg: floa
         else:
             estado = "GO"
 
-        # Limpiar objeto Shapely 'punto' antes de serializar a JSON
         afectados_json = [
             {"nombre": z["nombre"], "tipo": z["tipo"], "lat": z["lat"], "lon": z["lon"]}
             for z in afectados
