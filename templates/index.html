@@ -51,8 +51,9 @@
         let capaAlertas = null;
         let datosSimulacion = [];
 
-        // Cargar CSS y JS de Leaflet armando las URLs por partes para evitar recortes
-        const cdnBase = "//unpkg.com" + "/leaflet@1.9.4" + 
+        // Cargar CSS y JS de Leaflet sin caracteres especiales
+        const proto = window.location.protocol;
+        const cdnBase = proto + "//://unpkg.com";
 
         const linkCss = document.createElement("link");
         linkCss.rel = "stylesheet";
@@ -69,8 +70,7 @@
 
         function iniciarMapa() {
             map = L.map('map').setView([40.8065, -91.2468], 11);
-            const hostEsri = "https:" + "//://arcgisonline.com";
-            const rutaEsri = hostEsri + "/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+            const rutaEsri = proto + "//://arcgisonline.com{z}/{y}/{x}";
             L.tileLayer(rutaEsri, { attribution: 'Esri World Imagery' }).addTo(map);
             capaAlertas = L.layerGroup().addTo(map);
             setTimeout(() => { map.invalidateSize(); }, 300);
