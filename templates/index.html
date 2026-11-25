@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>BlastSafe DSS — Monitor de Dispersión</title>
-    <link rel="stylesheet" href="https://unpkg.com" />
+    <link rel="stylesheet" href="https://cloudflare.com" />
     <style>
         body { margin: 0; font-family: system-ui, sans-serif; display: flex; height: 100vh; background: #111; color: #eee; }
         #sidebar { width: 340px; padding: 20px; background: #1e1e24; overflow-y: auto; border-right: 1px solid #333; }
-        #map { flex: 1; height: 100%; }
+        #map { flex: 1; height: 100%; background: #1a1a1a; }
         input, button { width: 100%; padding: 8px; margin: 6px 0 12px; border-radius: 6px; border: 1px solid #444; background: #2b2b33; color: #fff; box-sizing: border-box; }
         button { background: #2563eb; border: none; font-weight: bold; cursor: pointer; }
         button:hover { background: #1d4ed8; }
@@ -34,7 +34,7 @@
         <label>Ventana Horaria: <strong id="lbl-hora">+0h</strong></label>
         <input type="range" id="slider" min="0" max="23" value="0" oninput="renderizarHora(this.value)">
 
-        <div id="estado-box" class="badge GO">Cargando...</div>
+        <div id="estado-box" class="badge GO">Iniciando...</div>
         <div id="detalles" style="font-size: 0.92rem; line-height: 1.5;"></div>
         <ul id="lista-alertas"></ul>
 
@@ -45,45 +45,62 @@
 
     <div id="map"></div>
 
-    <script src="https://unpkg.com"></script>
+    <script src="https://cloudflare.com"></script>
     <script>
-        const map = L.map('map').setView([40.8065, -91.2468], 11);
-        
-        const hostEsri = "https:" + "//://arcgisonline.com";
-        L.tileLayer(`${hostEsri}/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
-            attribution: 'Esri World Imagery'
-        }).addTo(map);
-
-        let datosSimulacion = [];
+        let map = null;
         let capaPluma = null;
         let marcadorOrigen = null;
-        let capaAlertas = L.layerGroup().addTo(map);
+        let capaAlertas = null;
+        let datosSimulacion = [];
+
+        // Inicializar mapa de forma segura
+        try {
+            map = L.map('map').setView([40.8065, -91.2468], 11);
+            const hostEsri = "https:" + "//://arcgisonline.com";
+            const rutaEsri = hostEsri + "/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+            L.tileLayer(rutaEsri, { attribution: 'Esri World Imagery' }).addTo(map);
+            capaAlertas = L.layerGroup().addTo(map);
+        } catch (err) {
+            document.getElementById('estado-box').innerText = "Error cargando Leaflet: " + err.message;
+        }
 
         async function cargarSimulacion() {
             const lat = document.getElementById('lat').value;
             const lon = document.getElementById('lon').value;
             const masa = document.getElementById('masa').value;
+            const box = document.getElementById('estado-box');
 
-            document.getElementById('estado-box').innerText = "Calculando...";
-            const resp = await fetch(`/api/simular?lat=${lat}&lon=${lon}&masa_kg=${masa}`);
-            const data = await resp.json();
+            box.innerText = "Consultando clima y simulando...";
+            try {
+                const resp = await fetch(`/api/simular?lat=${lat}&lon=${lon}&masa_kg=${masa}`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
 
-            datosSimulacion = data.horas;
-            const slider = document.getElementById('slider');
-            slider.max = Math.max(0, datosSimulacion.length - 1);
-            slider.value = 0;
+                datosSimulacion = data.horas || [];
+                const slider = document.getElementById('slider');
+                slider.max = Math.max(0, datosSimulacion.length - 1);
+                slider.value = 0;
 
-            map.setView([lat, lon], 11);
-            if (marcadorOrigen) map.removeLayer(marcadorOrigen);
-            marcadorOrigen = L.marker([lat, lon]).addTo(map).bindPopup("Punto de Detonación");
+                if (map) {
+                    map.setView([lat, lon], 11);
+                    if (marcadorOrigen) map.removeLayer(marcadorOrigen);
+                    marcadorOrigen = L.marker([lat, lon]).addTo(map).bindPopup("Punto de Detonación");
+                }
 
-            renderizarHora(0);
+                renderizarHora(0);
+            } catch (e) {
+                box.className = "badge NO_GO";
+                box.innerText = "Error API: " + e.message;
+            }
         }
 
         function renderizarHora(idx) {
+            const index = parseInt(idx, 10);
+            document.getElementById('lbl-hora').innerText = `+${index}h`;
+
             if (!datosSimulacion.length) return;
-            const h = datosSimulacion[idx];
-            document.getElementById('lbl-hora').innerText = `+${idx}h (${h.hora})`;
+            const h = datosSimulacion[index];
+            document.getElementById('lbl-hora').innerText = `+${index}h (${h.hora})`;
 
             const box = document.getElementById('estado-box');
             box.className = `badge ${h.estado}`;
@@ -98,8 +115,9 @@
             const lista = document.getElementById('lista-alertas');
             lista.innerHTML = h.afectados.map(z => `<li>${z.nombre} (${z.tipo})</li>`).join('');
 
+            if (!map) return;
             if (capaPluma) map.removeLayer(capaPluma);
-            capaAlertas.clearLayers();
+            if (capaAlertas) capaAlertas.clearLayers();
 
             if (h.pluma_geojson) {
                 const color = h.estado === "GO" ? "#22c55e" : "#ef4444";
