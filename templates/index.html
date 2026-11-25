@@ -45,51 +45,50 @@
     <div id="map"></div>
 
     <script>
-        let map = null;
-        let capaPluma = null;
-        let marcadorOrigen = null;
-        let capaAlertas = null;
-        let datosSimulacion = [];
+        var map = null;
+        var capaPluma = null;
+        var marcadorOrigen = null;
+        var capaAlertas = null;
+        var datosSimulacion = [];
 
-        // Cargar CSS y JS de Leaflet sin caracteres especiales
-        const proto = window.location.protocol;
-        const cdnBase = proto + "//://unpkg.com";
+        var proto = window.location.protocol;
+        var cdnBase = [proto, "", "unpkg.com", "leaflet", "dist"].join("/");
 
-        const linkCss = document.createElement("link");
+        var linkCss = document.createElement("link");
         linkCss.rel = "stylesheet";
         linkCss.href = cdnBase + "/leaflet.css";
         document.head.appendChild(linkCss);
 
-        const scriptJs = document.createElement("script");
+        var scriptJs = document.createElement("script");
         scriptJs.src = cdnBase + "/leaflet.js";
-        scriptJs.onload = () => {
+        scriptJs.onload = function() {
             iniciarMapa();
             cargarSimulacion();
         };
         document.head.appendChild(scriptJs);
 
         function iniciarMapa() {
-            map = L.map('map').setView([40.8065, -91.2468], 11);
-            const rutaEsri = proto + "//://arcgisonline.com{z}/{y}/{x}";
-            L.tileLayer(rutaEsri, { attribution: 'Esri World Imagery' }).addTo(map);
+            map = L.map("map").setView([40.8065, -91.2468], 11);
+            var rutaEsri = [proto, "", "://arcgisonline.com", "ArcGIS", "rest", "services", "World_Imagery", "MapServer", "tile", "{z}", "{y}", "{x}"].join("/");
+            L.tileLayer(rutaEsri, { attribution: "Esri World Imagery" }).addTo(map);
             capaAlertas = L.layerGroup().addTo(map);
-            setTimeout(() => { map.invalidateSize(); }, 300);
+            setTimeout(function() { map.invalidateSize(); }, 300);
         }
 
         async function cargarSimulacion() {
-            const lat = document.getElementById('lat').value;
-            const lon = document.getElementById('lon').value;
-            const masa = document.getElementById('masa').value;
-            const box = document.getElementById('estado-box');
+            var lat = document.getElementById("lat").value;
+            var lon = document.getElementById("lon").value;
+            var masa = document.getElementById("masa").value;
+            var box = document.getElementById("estado-box");
 
             box.innerText = "Consultando clima y simulando...";
             try {
-                const resp = await fetch(`/api/simular?lat=${lat}&lon=${lon}&masa_kg=${masa}`);
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                const data = await resp.json();
+                var resp = await fetch("/api/simular?lat=" + lat + "&lon=" + lon + "&masa_kg=" + masa);
+                if (!resp.ok) throw new Error("HTTP " + resp.status);
+                var data = await resp.json();
 
                 datosSimulacion = data.horas || [];
-                const slider = document.getElementById('slider');
+                var slider = document.getElementById("slider");
                 slider.max = Math.max(0, datosSimulacion.length - 1);
                 slider.value = 0;
 
@@ -107,46 +106,47 @@
         }
 
         function renderizarHora(idx) {
-            const index = parseInt(idx, 10);
+            var index = parseInt(idx, 10);
             if (!datosSimulacion.length) return;
-            const h = datosSimulacion[index];
-            document.getElementById('lbl-hora').innerText = `+${index}h (${h.hora})`;
+            var h = datosSimulacion[index];
+            document.getElementById("lbl-hora").innerText = "+" + index + "h (" + h.hora + ")";
 
-            const box = document.getElementById('estado-box');
-            box.className = `badge ${h.estado}`;
+            var box = document.getElementById("estado-box");
+            box.className = "badge " + h.estado;
             box.innerText = h.estado === "GO" ? "GO — VENTANA SEGURA" : "NO_GO — ALTO RIESGO";
 
-            document.getElementById('detalles').innerHTML = `
-                <b>Viento:</b> ${h.viento_ms} m/s (Origen: ${h.direccion_origen}°)<br>
-                <b>Inversión Térmica:</b> ${h.inversion ? "SÍ (Peligro)" : "No"}<br>
-                <b>Zonas afectadas:</b> ${h.afectados.length}
-            `;
+            document.getElementById("detalles").innerHTML =
+                "<b>Viento:</b> " + h.viento_ms + " m/s (Origen: " + h.direccion_origen + "°)<br>" +
+                "<b>Inversión Térmica:</b> " + (h.inversion ? "SÍ (Peligro)" : "No") + "<br>" +
+                "<b>Zonas afectadas:</b> " + h.afectados.length;
 
-            const lista = document.getElementById('lista-alertas');
-            lista.innerHTML = h.afectados.map(z => `<li>${z.nombre} (${z.tipo})</li>`).join('');
+            var lista = document.getElementById("lista-alertas");
+            lista.innerHTML = h.afectados.map(function(z) {
+                return "<li>" + z.nombre + " (" + z.tipo + ")</li>";
+            }).join("");
 
             if (!map) return;
             if (capaPluma) map.removeLayer(capaPluma);
             if (capaAlertas) capaAlertas.clearLayers();
 
             if (h.pluma_geojson) {
-                const color = h.estado === "GO" ? "#22c55e" : "#ef4444";
+                var color = h.estado === "GO" ? "#22c55e" : "#ef4444";
                 capaPluma = L.geoJSON(h.pluma_geojson, {
                     style: { color: color, fillColor: color, weight: 2, fillOpacity: 0.45 }
                 }).addTo(map);
             }
 
-            h.afectados.forEach(z => {
+            h.afectados.forEach(function(z) {
                 L.circleMarker([z.lat, z.lon], { radius: 7, color: "#a855f7", fillOpacity: 0.9 })
-                 .bindPopup(`${z.nombre} (${z.tipo})`)
+                 .bindPopup(z.nombre + " (" + z.tipo + ")")
                  .addTo(capaAlertas);
             });
         }
 
         function descargarArchivo(contenido, nombre, tipoMime) {
-            const blob = new Blob([contenido], { type: tipoMime });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
+            var blob = new Blob([contenido], { type: tipoMime });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement("a");
             a.href = url;
             a.download = nombre;
             a.click();
@@ -155,30 +155,32 @@
 
         function descargarGeoJSON() {
             if (!datosSimulacion.length) return;
-            const features = datosSimulacion
-                .filter(h => h.pluma_geojson !== null)
-                .map(h => ({
-                    type: "Feature",
-                    geometry: h.pluma_geojson,
-                    properties: {
-                        hora: h.hora,
-                        estado: h.estado,
-                        viento_ms: h.viento_ms,
-                        direccion_origen: h.direccion_origen,
-                        inversion_termica: h.inversion,
-                        zonas_afectadas: h.afectados.length
-                    }
-                }));
-            const fc = { type: "FeatureCollection", features: features };
+            var features = datosSimulacion
+                .filter(function(h) { return h.pluma_geojson !== null; })
+                .map(function(h) {
+                    return {
+                        type: "Feature",
+                        geometry: h.pluma_geojson,
+                        properties: {
+                            hora: h.hora,
+                            estado: h.estado,
+                            viento_ms: h.viento_ms,
+                            direccion_origen: h.direccion_origen,
+                            inversion_termica: h.inversion,
+                            zonas_afectadas: h.afectados.length
+                        }
+                    };
+                });
+            var fc = { type: "FeatureCollection", features: features };
             descargarArchivo(JSON.stringify(fc, null, 2), "blastsafe_plumas_24h.geojson", "application/geo+json");
         }
 
         function descargarCSV() {
             if (!datosSimulacion.length) return;
-            const filas = ["Hora,Estado,Viento_ms,Direccion_Origen,Inversion_Termica,Zonas_Afectadas,Detalle_Zonas"];
-            datosSimulacion.forEach(h => {
-                const nombres = h.afectados.map(z => `${z.nombre} (${z.tipo})`).join(" | ") || "Ninguna";
-                filas.push(`"${h.hora}","${h.estado}",${h.viento_ms},${h.direccion_origen},${h.inversion},${h.afectados.length},"${nombres}"`);
+            var filas = ["Hora,Estado,Viento_ms,Direccion_Origen,Inversion_Termica,Zonas_Afectadas,Detalle_Zonas"];
+            datosSimulacion.forEach(function(h) {
+                var nombres = h.afectados.map(function(z) { return z.nombre + " (" + z.tipo + ")"; }).join(" | ") || "Ninguna";
+                filas.push('"' + h.hora + '","' + h.estado + '",' + h.viento_ms + ',' + h.direccion_origen + ',' + h.inversion + ',' + h.afectados.length + ',"' + nombres + '"');
             });
             descargarArchivo(filas.join("\n"), "blastsafe_reporte_24h.csv", "text/csv;charset=utf-8;");
         }
