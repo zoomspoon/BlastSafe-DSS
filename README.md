@@ -18,7 +18,7 @@ Iowa Army Ammunition DSS. Decision Support System for Iowa Army Ammunition Plant
 
 ## Instalación Local
 ```bash
-git clone https://github.com
-cd blastsafe-dss
+git clone https://github.com/zoomspoon/BlastSafe-DSS
+cd BlastSafe-DSS
 pip install -r requirements.txt
 ```
