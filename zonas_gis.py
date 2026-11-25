@@ -1,4 +1,3 @@
-%%writefile zonas_gis.py
 import requests
 from shapely.geometry import Point
 
