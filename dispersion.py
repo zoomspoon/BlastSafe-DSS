@@ -10,8 +10,9 @@ def calcular_pluma(lat: float, lon: float, masa_kg: float, ws: float, wd: float)
     vs = 0.12
     umbral = 0.43
 
-    x_vals = np.linspace(50, 12000, 200)
-    y_vals = np.linspace(-2500, 2500, 100)
+    # Malla optimizada para servidores gratuitos (80x40 puntos)
+    x_vals = np.linspace(50, 12000, 80)
+    y_vals = np.linspace(-2500, 2500, 40)
     X, Y = np.meshgrid(x_vals, y_vals)
 
     sy = 0.08 * X * ((1 + 0.0001 * X) ** -0.5)
