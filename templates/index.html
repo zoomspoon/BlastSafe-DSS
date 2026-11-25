@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>BlastSafe DSS — Monitor de Dispersión</title>
-    <link rel="stylesheet" href="https://cloudflare.com" />
     <style>
         body { margin: 0; font-family: system-ui, sans-serif; display: flex; height: 100vh; background: #111; color: #eee; }
         #sidebar { width: 340px; padding: 20px; background: #1e1e24; overflow-y: auto; border-right: 1px solid #333; }
@@ -34,7 +33,7 @@
         <label>Ventana Horaria: <strong id="lbl-hora">+0h</strong></label>
         <input type="range" id="slider" min="0" max="23" value="0" oninput="renderizarHora(this.value)">
 
-        <div id="estado-box" class="badge GO">Iniciando...</div>
+        <div id="estado-box" class="badge GO">Cargando mapa...</div>
         <div id="detalles" style="font-size: 0.92rem; line-height: 1.5;"></div>
         <ul id="lista-alertas"></ul>
 
@@ -45,7 +44,6 @@
 
     <div id="map"></div>
 
-    <script src="https://cloudflare.com"></script>
     <script>
         let map = null;
         let capaPluma = null;
@@ -53,15 +51,29 @@
         let capaAlertas = null;
         let datosSimulacion = [];
 
-        // Inicializar mapa de forma segura
-        try {
+        // Cargar CSS y JS de Leaflet armando las URLs por partes para evitar recortes
+        const cdnBase = "https:" + "//://unpkg.com";
+
+        const linkCss = document.createElement("link");
+        linkCss.rel = "stylesheet";
+        linkCss.href = cdnBase + "/leaflet.css";
+        document.head.appendChild(linkCss);
+
+        const scriptJs = document.createElement("script");
+        scriptJs.src = cdnBase + "/leaflet.js";
+        scriptJs.onload = () => {
+            iniciarMapa();
+            cargarSimulacion();
+        };
+        document.head.appendChild(scriptJs);
+
+        function iniciarMapa() {
             map = L.map('map').setView([40.8065, -91.2468], 11);
             const hostEsri = "https:" + "//://arcgisonline.com";
             const rutaEsri = hostEsri + "/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
             L.tileLayer(rutaEsri, { attribution: 'Esri World Imagery' }).addTo(map);
             capaAlertas = L.layerGroup().addTo(map);
-        } catch (err) {
-            document.getElementById('estado-box').innerText = "Error cargando Leaflet: " + err.message;
+            setTimeout(() => { map.invalidateSize(); }, 300);
         }
 
         async function cargarSimulacion() {
@@ -96,8 +108,6 @@
 
         function renderizarHora(idx) {
             const index = parseInt(idx, 10);
-            document.getElementById('lbl-hora').innerText = `+${index}h`;
-
             if (!datosSimulacion.length) return;
             const h = datosSimulacion[index];
             document.getElementById('lbl-hora').innerText = `+${index}h (${h.hora})`;
@@ -172,8 +182,6 @@
             });
             descargarArchivo(filas.join("\n"), "blastsafe_reporte_24h.csv", "text/csv;charset=utf-8;");
         }
-
-        cargarSimulacion();
     </script>
 </body>
 </html>
