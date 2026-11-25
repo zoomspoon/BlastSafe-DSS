@@ -8,9 +8,11 @@
         body { margin: 0; font-family: system-ui, sans-serif; display: flex; height: 100vh; background: #111; color: #eee; }
         #sidebar { width: 340px; padding: 20px; background: #1e1e24; overflow-y: auto; border-right: 1px solid #333; }
         #map { flex: 1; height: 100%; }
-        input, button { width: 100%; padding: 8px; margin: 6px 0 14px; border-radius: 6px; border: 1px solid #444; background: #2b2b33; color: #fff; box-sizing: border-box; }
+        input, button { width: 100%; padding: 8px; margin: 6px 0 12px; border-radius: 6px; border: 1px solid #444; background: #2b2b33; color: #fff; box-sizing: border-box; }
         button { background: #2563eb; border: none; font-weight: bold; cursor: pointer; }
         button:hover { background: #1d4ed8; }
+        .btn-sec { background: #374151; margin-bottom: 8px; font-weight: normal; }
+        .btn-sec:hover { background: #4b5563; }
         .badge { padding: 8px; border-radius: 6px; text-align: center; font-weight: bold; margin-bottom: 12px; }
         .GO { background: #166534; color: #bbf7d0; }
         .NO_GO { background: #991b1b; color: #fecaca; }
@@ -28,13 +30,17 @@
         <input type="number" id="masa" value="4400">
         <button onclick="cargarSimulacion()">Simular Escenario (24h)</button>
 
-        <hr style="border-color: #333; margin: 16px 0;">
+        <hr style="border-color: #333; margin: 14px 0;">
         <label>Ventana Horaria: <strong id="lbl-hora">+0h</strong></label>
         <input type="range" id="slider" min="0" max="23" value="0" oninput="renderizarHora(this.value)">
 
         <div id="estado-box" class="badge GO">Cargando...</div>
         <div id="detalles" style="font-size: 0.92rem; line-height: 1.5;"></div>
         <ul id="lista-alertas"></ul>
+
+        <hr style="border-color: #333; margin: 14px 0;">
+        <button class="btn-sec" onclick="descargarGeoJSON()">Descargar GeoJSON (24h)</button>
+        <button class="btn-sec" onclick="descargarCSV()">Descargar Reporte CSV</button>
     </div>
 
     <div id="map"></div>
@@ -43,7 +49,6 @@
     <script>
         const map = L.map('map').setView([40.8065, -91.2468], 11);
         
-        // URL satelital construida por partes para evitar recortes
         const hostEsri = "https:" + "//://arcgisonline.com";
         L.tileLayer(`${hostEsri}/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
             attribution: 'Esri World Imagery'
@@ -108,6 +113,46 @@
                  .bindPopup(`${z.nombre} (${z.tipo})`)
                  .addTo(capaAlertas);
             });
+        }
+
+        function descargarArchivo(contenido, nombre, tipoMime) {
+            const blob = new Blob([contenido], { type: tipoMime });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombre;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function descargarGeoJSON() {
+            if (!datosSimulacion.length) return;
+            const features = datosSimulacion
+                .filter(h => h.pluma_geojson !== null)
+                .map(h => ({
+                    type: "Feature",
+                    geometry: h.pluma_geojson,
+                    properties: {
+                        hora: h.hora,
+                        estado: h.estado,
+                        viento_ms: h.viento_ms,
+                        direccion_origen: h.direccion_origen,
+                        inversion_termica: h.inversion,
+                        zonas_afectadas: h.afectados.length
+                    }
+                }));
+            const fc = { type: "FeatureCollection", features: features };
+            descargarArchivo(JSON.stringify(fc, null, 2), "blastsafe_plumas_24h.geojson", "application/geo+json");
+        }
+
+        function descargarCSV() {
+            if (!datosSimulacion.length) return;
+            const filas = ["Hora,Estado,Viento_ms,Direccion_Origen,Inversion_Termica,Zonas_Afectadas,Detalle_Zonas"];
+            datosSimulacion.forEach(h => {
+                const nombres = h.afectados.map(z => `${z.nombre} (${z.tipo})`).join(" | ") || "Ninguna";
+                filas.push(`"${h.hora}","${h.estado}",${h.viento_ms},${h.direccion_origen},${h.inversion},${h.afectados.length},"${nombres}"`);
+            });
+            descargarArchivo(filas.join("\n"), "blastsafe_reporte_24h.csv", "text/csv;charset=utf-8;");
         }
 
         cargarSimulacion();
