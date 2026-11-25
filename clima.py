@@ -1,4 +1,3 @@
-%%writefile clima.py
 import requests
 
 def obtener_pronostico(lat: float, lon: float, horas: int = 24) -> dict:
